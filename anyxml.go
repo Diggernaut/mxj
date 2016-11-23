@@ -1,6 +1,7 @@
 package mxj
 
 import (
+	"bytes"
 	"encoding/xml"
 	"reflect"
 )
@@ -135,7 +136,8 @@ func AnyXmlIndent(v interface{}, prefix, indent string, tags ...string) ([]byte,
 	} else {
 		et = DefaultElementTag
 	}
-
+	rt = checkKey(rt)
+	et = checkKey(et)
 	var ss string
 	var b []byte
 	switch v.(type) {
@@ -148,7 +150,7 @@ func AnyXmlIndent(v interface{}, prefix, indent string, tags ...string) ([]byte,
 				m := vv.(map[string]interface{})
 				if len(m) == 1 {
 					for tag, val := range m {
-						err = mapToXmlIndent(true, s, tag, val, p)
+						err = mapToXmlIndent(true, s, checkKey(tag), val, p)
 					}
 				} else {
 					p.start = 1 // we 1 tag in
@@ -175,3 +177,66 @@ func AnyXmlIndent(v interface{}, prefix, indent string, tags ...string) ([]byte,
 
 	return b, err
 }
+func AnyXmlIndentByte(v interface{}, prefix, indent string, tags ...string) ([]byte, error) {
+	if reflect.TypeOf(v).Kind() == reflect.Struct {
+		return xml.MarshalIndent(v, prefix, indent)
+	}
+
+	var err error
+	var buffer bytes.Buffer
+	p := new(pretty)
+	p.indent = indent
+	p.padding = prefix
+
+	var rt, et string
+	if len(tags) == 1 || len(tags) == 2 {
+		rt = tags[0]
+	} else {
+		rt = DefaultRootTag
+	}
+	if len(tags) == 2 {
+		et = tags[1]
+	} else {
+		et = DefaultElementTag
+	}
+	rt = checkKey(rt)
+	et = checkKey(et)
+	var b []byte
+	switch v.(type) {
+	case []interface{}:
+		_, err = buffer.Write([]byte("<" + checkKey(rt) + ">\n"))
+		p.Indent()
+		for _, vv := range v.([]interface{}) {
+			switch vv.(type) {
+			case map[string]interface{}:
+				m := vv.(map[string]interface{})
+				if len(m) == 1 {
+					for tag, val := range m {
+						err = mapToXmlIndentByte(true, &buffer, checkKey(tag), val, p)
+					}
+				} else {
+					p.start = 1 // we 1 tag in
+					err = mapToXmlIndentByte(true, &buffer, et, vv, p)
+					_, err = buffer.Write([]byte("\n"))
+				}
+			default:
+				p.start = 0 // in case trailing p.start = 1
+				err = mapToXmlIndentByte(true, &buffer, et, vv, p)
+			}
+			if err != nil {
+				break
+			}
+		}
+		buffer.Write([]byte("</" + rt + ">"))
+		b = buffer.Bytes()
+	case map[string]interface{}:
+		m := Map(v.(map[string]interface{}))
+		b, err = m.XmlIndentByte(prefix, indent, rt)
+	default:
+		err = mapToXmlIndentByte(true, &buffer, rt, v, p)
+		b = buffer.Bytes()
+	}
+	return b, err
+}
+
+

@@ -21,6 +21,10 @@ import (
 	"time"
 )
 
+func init() {
+	checkKeys = make(map[string]string)
+}
+
 // ------------------- NewMapXml & NewMapXmlReader ... -------------------------
 
 // If XmlCharsetReader != nil, it will be used to decode the XML, if required.
@@ -240,8 +244,8 @@ func CoerceKeysToLower(b ...bool) {
 // We do this by replacing '`' constant with attrPrefix var, replacing useHyphen with attrPrefix = "",
 // and adding a SetAttrPrefix(s string) function.
 
-var attrPrefix string = `-` // the default
-var lenAttrPrefix int = 1   // the default
+var attrPrefix string = `-------------!!!------------` // the default
+var lenAttrPrefix int = 1                              // the default
 
 // SetAttrPrefix changes the default, "-", to the specified value, s.
 // SetAttrPrefix("") is the same as PrependAttrWithHyphen(false).
@@ -439,6 +443,25 @@ const (
 )
 
 var useGoXmlEmptyElemSyntax bool
+
+var checkKeys map[string]string
+
+func XmlCheckKeysMapAdd(key, value string) {
+	checkKeys[key] = value
+}
+func XmlCheckKeysMapRemove(key string) {
+	if _, ok := checkKeys[key]; ok {
+		delete(checkKeys, key)
+	}
+}
+func XmlCheckKeysMapNewFromMap(newMap map[string]string) {
+	checkKeys = nil
+	checkKeys = make(map[string]string)
+	for k, v := range newMap {
+		checkKeys[k] = v
+	}
+
+}
 
 // XmlGoEmptyElemSyntax() - <tag ...></tag> rather than <tag .../>.
 //	Go's encoding/xml package marshals empty XML elements as <tag ...></tag>.  By default this package
@@ -712,7 +735,6 @@ func (b *byteReader) ReadByte() (byte, error) {
 // See Xml for encoding rules.
 func (mv Map) XmlIndent(prefix, indent string, rootTag ...string) ([]byte, error) {
 	m := map[string]interface{}(mv)
-
 	var err error
 	s := new(string)
 	p := new(pretty)
@@ -726,15 +748,40 @@ func (mv Map) XmlIndent(prefix, indent string, rootTag ...string) ([]byte, error
 			if _, ok := value.([]interface{}); ok {
 				err = mapToXmlIndent(true, s, DefaultRootTag, m, p)
 			} else {
-				err = mapToXmlIndent(true, s, key, value, p)
+				err = mapToXmlIndent(true, s, checkKey(key), value, p)
 			}
 		}
 	} else if len(rootTag) == 1 {
-		err = mapToXmlIndent(true, s, rootTag[0], m, p)
+		err = mapToXmlIndent(true, s, checkKey(rootTag[0]), m, p)
 	} else {
 		err = mapToXmlIndent(true, s, DefaultRootTag, m, p)
 	}
 	return []byte(*s), err
+}
+func (mv Map) XmlIndentByte(prefix string, indent string, rootTag ...string) ([]byte, error) {
+	m := map[string]interface{}(mv)
+
+	var err error
+	p := new(pretty)
+	p.indent = indent
+	p.padding = prefix
+	var buffer bytes.Buffer
+	if len(m) == 1 && len(rootTag) == 0 {
+		// this can extract the key for the single map element
+		// use it if it isn't a key for a list
+		for key, value := range m {
+			if _, ok := value.([]interface{}); ok {
+				err = mapToXmlIndentByte(true, &buffer, DefaultRootTag, m, p)
+			} else {
+				err = mapToXmlIndentByte(true, &buffer, checkKey(key), value, p)
+			}
+		}
+	} else if len(rootTag) == 1 {
+		err = mapToXmlIndentByte(true, &buffer, checkKey(rootTag[0]), m, p)
+	} else {
+		err = mapToXmlIndentByte(true, &buffer, DefaultRootTag, m, p)
+	}
+	return buffer.Bytes(), err
 }
 
 type pretty struct {
@@ -771,7 +818,7 @@ func mapToXmlIndent(doIndent bool, s *string, key string, value interface{}, pp 
 		if doIndent {
 			*s += p.padding
 		}
-		*s += `<` + key
+		*s += `<` + checkKey(key)
 	}
 	switch value.(type) {
 	case map[string]interface{}:
@@ -819,10 +866,10 @@ func mapToXmlIndent(doIndent bool, s *string, key string, value interface{}, pp 
 		// only attributes?
 		if n == lenvv {
 			if useGoXmlEmptyElemSyntax {
-				*s += `</` + key + ">"
-			} else {
-				*s += `/>`
-			}
+ 				*s += `</` + key + ">"
+ 			} else {
+ 				*s += `/>`
+ 			}
 			break
 		}
 
@@ -883,7 +930,7 @@ func mapToXmlIndent(doIndent bool, s *string, key string, value interface{}, pp 
 			if doIndent {
 				*s += p.padding + p.indent
 			}
-			*s += "<" + key
+			*s += "<" + checkKey(key)
 			elen = 0
 			endTag = true
 			break
@@ -892,7 +939,7 @@ func mapToXmlIndent(doIndent bool, s *string, key string, value interface{}, pp 
 			if doIndent {
 				p.Indent()
 			}
-			mapToXmlIndent(doIndent, s, key, v, p)
+			mapToXmlIndent(doIndent, s, checkKey(key), v, p)
 			if doIndent {
 				p.Outdent()
 			}
@@ -900,7 +947,7 @@ func mapToXmlIndent(doIndent bool, s *string, key string, value interface{}, pp 
 		return nil
 	case nil:
 		// terminate the tag
-		*s += "<" + key
+		*s += "<" + checkKey(key)
 		break
 	default: // handle anything - even goofy stuff
 		elen = 0
@@ -958,7 +1005,7 @@ func mapToXmlIndent(doIndent bool, s *string, key string, value interface{}, pp 
 			if elen == 0 {
 				*s += ">"
 			}
-			*s += `</` + key + ">"
+			*s += `</` + checkKey(key) + ">"
 		} else {
 			*s += `/>`
 		}
@@ -966,6 +1013,228 @@ func mapToXmlIndent(doIndent bool, s *string, key string, value interface{}, pp 
 	if doIndent {
 		if p.cnt > p.start {
 			*s += "\n"
+		}
+		p.Outdent()
+	}
+
+	return nil
+}
+
+func checkKey(key string) string {
+	if val, ok := checkKeys[key]; ok {
+		return val
+	}
+	return key
+}
+func mapToXmlIndentByte(doIndent bool, buffer *bytes.Buffer, key string, value interface{}, pp *pretty) error {
+	var endTag bool
+	var isSimple bool
+	var elen int
+	p := &pretty{pp.indent, pp.cnt, pp.padding, pp.mapDepth, pp.start}
+	switch value.(type) {
+	// special handling of []interface{} values when len(value) == 0
+	case map[string]interface{}, []byte, string, float64, bool, int, int32, int64, float32, json.Number:
+		if doIndent {
+			buffer.Write([]byte(p.padding))
+		}
+		buffer.Write([]byte(`<` + checkKey(key)))
+	}
+	switch value.(type) {
+	case map[string]interface{}:
+		vv := value.(map[string]interface{})
+		lenvv := len(vv)
+		// scan out attributes - attribute keys have prepended attrPrefix
+		attrlist := make([][2]string, len(vv))
+		var n int
+		var ss string
+		for k, v := range vv {
+			if k[:lenAttrPrefix] == attrPrefix {
+
+				switch v.(type) {
+				case string:
+					if xmlEscapeChars {
+						ss = escapeChars(v.(string))
+					} else {
+						ss = v.(string)
+					}
+					attrlist[n][0] = k[lenAttrPrefix:]
+					attrlist[n][1] = ss
+				case float64, bool, int, int32, int64, float32, json.Number:
+					attrlist[n][0] = k[lenAttrPrefix:]
+					attrlist[n][1] = fmt.Sprintf("%v", v)
+				case []byte:
+					if xmlEscapeChars {
+						ss = escapeChars(string(v.([]byte)))
+					} else {
+						ss = string(v.([]byte))
+					}
+					attrlist[n][0] = k[lenAttrPrefix:]
+					attrlist[n][1] = ss
+				default:
+					return fmt.Errorf("invalid attribute value for: %s:<%T>", k, v)
+				}
+				n++
+			}
+		}
+		if n > 0 {
+			fmt.Println(true)
+			attrlist = attrlist[:n]
+			sort.Sort(attrList(attrlist))
+			for _, v := range attrlist {
+				buffer.Write([]byte(` ` + v[0] + `="` + v[1] + `"`))
+			}
+		}
+		// only attributes?
+		if n == lenvv {
+			if useGoXmlEmptyElemSyntax {
+				buffer.Write([]byte(`</` + checkKey(key) + ">"))
+			} else {
+				buffer.Write([]byte(`/>`))
+			}
+			break
+		}
+
+		// simple element? Note: '#text" is an invalid XML tag.
+		if v, ok := vv["#text"]; ok && n+1 == lenvv {
+			buffer.Write([]byte(">" + fmt.Sprintf("%v", v)))
+			endTag = true
+			elen = 1
+			isSimple = true
+			break
+		}
+		// close tag with possible attributes
+		buffer.Write([]byte(">"))
+		if doIndent {
+			buffer.Write([]byte("\n"))
+		}
+		// something more complex
+		p.mapDepth++
+		// extract the map k:v pairs and sort on key
+		elemlist := make([][2]interface{}, len(vv))
+		n = 0
+		for k, v := range vv {
+			if k[:lenAttrPrefix] == attrPrefix {
+				continue
+			}
+			elemlist[n][0] = k
+			elemlist[n][1] = v
+			n++
+		}
+		elemlist = elemlist[:n]
+		sort.Sort(elemList(elemlist))
+		var i int
+		for _, v := range elemlist {
+			switch v[1].(type) {
+			case []interface{}:
+			default:
+				if i == 0 && doIndent {
+					p.Indent()
+				}
+			}
+			i++
+			mapToXmlIndentByte(doIndent, buffer, v[0].(string), v[1], p)
+			switch v[1].(type) {
+			case []interface{}: // handled in []interface{} case
+			default:
+				if doIndent {
+					p.Outdent()
+				}
+			}
+			i--
+		}
+		p.mapDepth--
+		endTag = true
+		elen = 1 // we do have some content ...
+	case []interface{}:
+		// special case - found during implementing Issue #23
+		if len(value.([]interface{})) == 0 {
+			if doIndent {
+				buffer.Write([]byte(p.padding + p.indent))
+			}
+			buffer.Write([]byte("<" + checkKey(key)))
+			elen = 0
+			endTag = true
+			break
+		}
+		for _, v := range value.([]interface{}) {
+			if doIndent {
+				p.Indent()
+			}
+			mapToXmlIndentByte(doIndent, buffer, checkKey(key), v, p)
+			if doIndent {
+				p.Outdent()
+			}
+		}
+		return nil
+	case nil:
+		// terminate the tag
+		endTag = true
+		buffer.Write([]byte("<" + checkKey(key)))
+		break
+	default: // handle anything - even goofy stuff
+		elen = 0
+		switch value.(type) {
+		case string:
+			v := value.(string)
+			if xmlEscapeChars {
+				v = escapeChars(v)
+			}
+			elen = len(v)
+			if elen > 0 {
+				buffer.Write([]byte(">" + v))
+			}
+		case float64, bool, int, int32, int64, float32, json.Number:
+			v := fmt.Sprintf("%v", value)
+			elen = len(v) // always > 0
+			buffer.Write([]byte(">" + v))
+		case []byte: // NOTE: byte is just an alias for uint8
+			// similar to how xml.Marshal handles []byte structure members
+			v := string(value.([]byte))
+			if xmlEscapeChars {
+				v = escapeChars(v)
+			}
+			elen = len(v)
+			if elen > 0 {
+				buffer.Write([]byte(">" + v))
+			}
+		default:
+			var v []byte
+			var err error
+			if doIndent {
+				v, err = xml.MarshalIndent(value, p.padding, p.indent)
+			} else {
+				v, err = xml.Marshal(value)
+			}
+			if err != nil {
+				buffer.Write([]byte(">UNKNOWN"))
+			} else {
+				elen = len(v)
+				if elen > 0 {
+					buffer.Write(v)
+				}
+			}
+		}
+		isSimple = true
+		endTag = true
+	}
+	if endTag {
+		if doIndent {
+			if !isSimple {
+				buffer.Write([]byte(p.padding))
+			}
+		}
+		if elen > 0 || useGoXmlEmptyElemSyntax {
+			if elen == 0 {
+				buffer.Write([]byte(">"))
+			}
+			buffer.Write([]byte(`</` + checkKey(key) + ">"))
+		} else {
+			buffer.Write([]byte(`/>`))
+		}
+	}
+	if doIndent {
+		if p.cnt > p.start {
+			buffer.Write([]byte("\n"))
 		}
 		p.Outdent()
 	}
