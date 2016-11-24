@@ -16,7 +16,8 @@ For over a year I've wanted to refactor the XML-to-map[string]interface{} decode
 	BenchmarkNewStructJsonBooks-4	  100000	     15309 ns/op
 
 <h4>Notices</h4>
-	2016.11.24  Added functions using bytes.Buffer instead of a string, which will greatly speed AnyXmlIndent(AnyXmlIdentByte). 			    Also we added func for replace keys in the map, for further work with goquery. 
+	2016.11.24: Added functions using bytes.Buffer instead of a string, which will greatly speed AnyXmlIndent(AnyXmlIdentByte).
+		        Also we added func for replace keys in the map, for further work with goquery. 
 	2016.11.07: Preserve name space prefix syntax in XmlSeq parser - NewMapXmlSeq(), etc.
 	2016.06.25: Support overriding default XML attribute prefix, "-", in Map keys - SetAttrPrefix().
 	2016.05.26: Support customization of xml.Decoder by exposing CustomDecoder variable.
