@@ -15,14 +15,42 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 )
+
+var re *regexp.Regexp
 
 func init() {
 	checkKeys = make(map[string]string)
+	re = regexp.MustCompile("^[A-z]+")
+}
+
+func checkKey(key string) string {
+	key = SpaceMap(key)
+	if val, ok := checkKeys[key]; ok {
+		return val
+	}
+	if useUnknowCharReplacer {
+		if !re.MatchString(key) {
+			key = "safe_" + key
+		}
+
+	}
+	return key
+}
+
+func SpaceMap(str string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			return -1
+		}
+		return r
+	}, str)
 }
 
 // ------------------- NewMapXml & NewMapXmlReader ... -------------------------
@@ -444,7 +472,12 @@ const (
 
 var useGoXmlEmptyElemSyntax bool
 
+var useUnknowCharReplacer bool
 var checkKeys map[string]string
+
+func UseUnknowCharReplacer() {
+	useUnknowCharReplacer = true
+}
 
 func XmlCheckKeysMapAdd(key, value string) {
 	checkKeys[key] = value
@@ -460,7 +493,6 @@ func XmlCheckKeysMapNewFromMap(newMap map[string]string) {
 	for k, v := range newMap {
 		checkKeys[k] = v
 	}
-
 }
 
 // XmlGoEmptyElemSyntax() - <tag ...></tag> rather than <tag .../>.
@@ -866,10 +898,10 @@ func mapToXmlIndent(doIndent bool, s *string, key string, value interface{}, pp 
 		// only attributes?
 		if n == lenvv {
 			if useGoXmlEmptyElemSyntax {
- 				*s += `</` + key + ">"
- 			} else {
- 				*s += `/>`
- 			}
+				*s += `</` + key + ">"
+			} else {
+				*s += `/>`
+			}
 			break
 		}
 
@@ -1020,12 +1052,6 @@ func mapToXmlIndent(doIndent bool, s *string, key string, value interface{}, pp 
 	return nil
 }
 
-func checkKey(key string) string {
-	if val, ok := checkKeys[key]; ok {
-		return val
-	}
-	return key
-}
 func mapToXmlIndentByte(doIndent bool, buffer *bytes.Buffer, key string, value interface{}, pp *pretty) error {
 	var endTag bool
 	var isSimple bool
@@ -1049,7 +1075,6 @@ func mapToXmlIndentByte(doIndent bool, buffer *bytes.Buffer, key string, value i
 		var ss string
 		for k, v := range vv {
 			if k[:lenAttrPrefix] == attrPrefix {
-
 				switch v.(type) {
 				case string:
 					if xmlEscapeChars {
@@ -1077,7 +1102,6 @@ func mapToXmlIndentByte(doIndent bool, buffer *bytes.Buffer, key string, value i
 			}
 		}
 		if n > 0 {
-			fmt.Println(true)
 			attrlist = attrlist[:n]
 			sort.Sort(attrList(attrlist))
 			for _, v := range attrlist {
@@ -1087,7 +1111,7 @@ func mapToXmlIndentByte(doIndent bool, buffer *bytes.Buffer, key string, value i
 		// only attributes?
 		if n == lenvv {
 			if useGoXmlEmptyElemSyntax {
-				buffer.Write([]byte(`</` + checkKey(key) + ">"))
+				buffer.Write([]byte(`></` + checkKey(key) + ">"))
 			} else {
 				buffer.Write([]byte(`/>`))
 			}
