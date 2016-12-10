@@ -1073,8 +1073,17 @@ func mapToXmlIndentByte(doIndent bool, buffer *bytes.Buffer, key string, value i
 		attrlist := make([][2]string, len(vv))
 		var n int
 		var ss string
+		if n == lenvv {
+			if useGoXmlEmptyElemSyntax {
+				buffer.Write([]byte(`></` + checkKey(key) + ">"))
+			} else {
+				buffer.Write([]byte(`/>`))
+			}
+			break
+		}
 		for k, v := range vv {
-			if k[:lenAttrPrefix] == attrPrefix {
+			
+			if len(k) > lenAttrPrefix && k[:lenAttrPrefix] == attrPrefix {
 				switch v.(type) {
 				case string:
 					if xmlEscapeChars {
@@ -1109,14 +1118,7 @@ func mapToXmlIndentByte(doIndent bool, buffer *bytes.Buffer, key string, value i
 			}
 		}
 		// only attributes?
-		if n == lenvv {
-			if useGoXmlEmptyElemSyntax {
-				buffer.Write([]byte(`></` + checkKey(key) + ">"))
-			} else {
-				buffer.Write([]byte(`/>`))
-			}
-			break
-		}
+
 
 		// simple element? Note: '#text" is an invalid XML tag.
 		if v, ok := vv["#text"]; ok && n+1 == lenvv {
@@ -1137,7 +1139,7 @@ func mapToXmlIndentByte(doIndent bool, buffer *bytes.Buffer, key string, value i
 		elemlist := make([][2]interface{}, len(vv))
 		n = 0
 		for k, v := range vv {
-			if k[:lenAttrPrefix] == attrPrefix {
+			if len(k) > lenAttrPrefix && k[:lenAttrPrefix] == attrPrefix {
 				continue
 			}
 			elemlist[n][0] = k
