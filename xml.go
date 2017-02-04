@@ -27,7 +27,7 @@ var re *regexp.Regexp
 
 func init() {
 	checkKeys = make(map[string]string)
-	re = regexp.MustCompile("^[A-z]+")
+	re = regexp.MustCompile(`^[A-Za-z]+`)
 }
 
 func checkKey(key string) string {
@@ -39,7 +39,6 @@ func checkKey(key string) string {
 		if !re.MatchString(key) {
 			key = "safe_" + key
 		}
-
 	}
 	return key
 }
@@ -272,8 +271,8 @@ func CoerceKeysToLower(b ...bool) {
 // We do this by replacing '`' constant with attrPrefix var, replacing useHyphen with attrPrefix = "",
 // and adding a SetAttrPrefix(s string) function.
 
-var attrPrefix string = `-------------!!!------------` // the default
-var lenAttrPrefix int = 1                              // the default
+var attrPrefix string = `-` // the default
+var lenAttrPrefix int = 1   // the default
 
 // SetAttrPrefix changes the default, "-", to the specified value, s.
 // SetAttrPrefix("") is the same as PrependAttrWithHyphen(false).
@@ -943,7 +942,7 @@ func mapToXmlIndent(doIndent bool, s *string, key string, value interface{}, pp 
 				}
 			}
 			i++
-			mapToXmlIndent(doIndent, s, v[0].(string), v[1], p)
+			mapToXmlIndent(doIndent, s, checkKey(v[0].(string)), v[1], p)
 			switch v[1].(type) {
 			case []interface{}: // handled in []interface{} case
 			default:
@@ -1082,7 +1081,7 @@ func mapToXmlIndentByte(doIndent bool, buffer *bytes.Buffer, key string, value i
 			break
 		}
 		for k, v := range vv {
-			
+
 			if len(k) > lenAttrPrefix && k[:lenAttrPrefix] == attrPrefix {
 				switch v.(type) {
 				case string:
@@ -1118,7 +1117,6 @@ func mapToXmlIndentByte(doIndent bool, buffer *bytes.Buffer, key string, value i
 			}
 		}
 		// only attributes?
-
 
 		// simple element? Note: '#text" is an invalid XML tag.
 		if v, ok := vv["#text"]; ok && n+1 == lenvv {
