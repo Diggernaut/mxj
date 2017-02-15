@@ -24,21 +24,24 @@ import (
 )
 
 var re *regexp.Regexp
-
+var s *strings.Replacer
 func init() {
 	checkKeys = make(map[string]string)
 	re = regexp.MustCompile(`^[A-Za-z]+`)
+	s = strings.NewReplacer(":", "_")
 }
 
 func checkKey(key string) string {
 	key = SpaceMap(key)
-	lkey := strings.ToLower(key)
-	if val, ok := checkKeys[lkey]; ok {
+	key = s.Replace(key)
+	key = strings.ToLower(key)
+	
+	if val, ok := checkKeys[key]; ok {
 		return val
 	}
 	if useUnknowCharReplacer {
 		if !re.MatchString(key) {
-			lkey = "safe_" + lkey
+			key = "safe_" + key
 		}
 	}
 	return key
