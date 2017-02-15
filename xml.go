@@ -32,12 +32,13 @@ func init() {
 
 func checkKey(key string) string {
 	key = SpaceMap(key)
-	if val, ok := checkKeys[key]; ok {
+	lkey := strings.ToLower(key)
+	if val, ok := checkKeys[lkey]; ok {
 		return val
 	}
 	if useUnknowCharReplacer {
 		if !re.MatchString(key) {
-			key = "safe_" + key
+			lkey = "safe_" + lkey
 		}
 	}
 	return key
