@@ -28,7 +28,8 @@ var s *strings.Replacer
 func init() {
 	checkKeys = make(map[string]string)
 	re = regexp.MustCompile(`^[A-Za-z]+`)
-	s = strings.NewReplacer(":", "_")
+	s = strings.NewReplacer(":", "_",
+		"@", "_")
 }
 
 func checkKey(key string) string {
