@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"reflect"
 )
 
 var re *regexp.Regexp
@@ -1063,13 +1064,123 @@ func mapToXmlIndentByte(doIndent bool, buffer *bytes.Buffer, key string, value i
 	p := &pretty{pp.indent, pp.cnt, pp.padding, pp.mapDepth, pp.start}
 	switch value.(type) {
 	// special handling of []interface{} values when len(value) == 0
-	case map[string]interface{}, []byte, string, float64, bool, int, int32, int64, float32, json.Number:
+	case map[string]interface{},map[interface{}]interface{}, []byte, string, float64, bool, int, int32, int64, float32, json.Number:
 		if doIndent {
 			buffer.Write([]byte(p.padding))
 		}
 		buffer.Write([]byte(`<` + checkKey(key)))
 	}
 	switch value.(type) {
+	case map[interface{}]interface{}:
+		var handlemap = make(map[string]interface{})
+		for k, v := range value.(map[interface{}]interface{}) {
+			if key, ok := k.(string);ok{
+				handlemap[key] = v
+			} 
+		}
+		vv := handlemap
+		lenvv := len(vv)
+		// scan out attributes - attribute keys have prepended attrPrefix
+		attrlist := make([][2]string, len(vv))
+		var n int
+		var ss string
+		if n == lenvv {
+			if useGoXmlEmptyElemSyntax {
+				buffer.Write([]byte(`></` + checkKey(key) + ">"))
+			} else {
+				buffer.Write([]byte(`/>`))
+			}
+			break
+		}
+		for k, v := range vv {
+
+			if len(k) > lenAttrPrefix && k[:lenAttrPrefix] == attrPrefix {
+				switch v.(type) {
+				case string:
+					if xmlEscapeChars {
+						ss = escapeChars(v.(string))
+					} else {
+						ss = v.(string)
+					}
+					attrlist[n][0] = k[lenAttrPrefix:]
+					attrlist[n][1] = ss
+				case float64, bool, int, int32, int64, float32, json.Number:
+					attrlist[n][0] = k[lenAttrPrefix:]
+					attrlist[n][1] = fmt.Sprintf("%v", v)
+				case []byte:
+					if xmlEscapeChars {
+						ss = escapeChars(string(v.([]byte)))
+					} else {
+						ss = string(v.([]byte))
+					}
+					attrlist[n][0] = k[lenAttrPrefix:]
+					attrlist[n][1] = ss
+				default:
+					return fmt.Errorf("invalid attribute value for: %s:<%T>", k, v)
+				}
+				n++
+			}
+		}
+		if n > 0 {
+			attrlist = attrlist[:n]
+			sort.Sort(attrList(attrlist))
+			for _, v := range attrlist {
+				buffer.Write([]byte(` ` + v[0] + `="` + v[1] + `"`))
+			}
+		}
+		// only attributes?
+
+		// simple element? Note: '#text" is an invalid XML tag.
+		if v, ok := vv["#text"]; ok && n+1 == lenvv {
+			buffer.Write([]byte(">" + fmt.Sprintf("%v", v)))
+			endTag = true
+			elen = 1
+			isSimple = true
+			break
+		}
+		// close tag with possible attributes
+		buffer.Write([]byte(">"))
+		if doIndent {
+			buffer.Write([]byte("\n"))
+		}
+		// something more complex
+		p.mapDepth++
+		// extract the map k:v pairs and sort on key
+		elemlist := make([][2]interface{}, len(vv))
+		n = 0
+		for k, v := range vv {
+			if len(k) > lenAttrPrefix && k[:lenAttrPrefix] == attrPrefix {
+				continue
+			}
+			elemlist[n][0] = k
+			elemlist[n][1] = v
+			n++
+		}
+		elemlist = elemlist[:n]
+		sort.Sort(elemList(elemlist))
+		var i int
+		for _, v := range elemlist {
+			switch v[1].(type) {
+			case []interface{}:
+			default:
+				if i == 0 && doIndent {
+					p.Indent()
+				}
+			}
+			i++
+			mapToXmlIndentByte(doIndent, buffer, v[0].(string), v[1], p)
+			switch v[1].(type) {
+			case []interface{}: // handled in []interface{} case
+			default:
+				if doIndent {
+					p.Outdent()
+				}
+			}
+			i--
+		}
+		p.mapDepth--
+		endTag = true
+		elen = 1 // we do have some content ...
 	case map[string]interface{}:
 		vv := value.(map[string]interface{})
 		lenvv := len(vv)
@@ -1227,6 +1338,7 @@ func mapToXmlIndentByte(doIndent bool, buffer *bytes.Buffer, key string, value i
 				buffer.Write([]byte(">" + v))
 			}
 		default:
+			fmt.Println(reflect.TypeOf(value).Kind())
 			var v []byte
 			var err error
 			if doIndent {
@@ -1235,6 +1347,7 @@ func mapToXmlIndentByte(doIndent bool, buffer *bytes.Buffer, key string, value i
 				v, err = xml.Marshal(value)
 			}
 			if err != nil {
+				fmt.Println(err)
 				buffer.Write([]byte(">UNKNOWN"))
 			} else {
 				elen = len(v)
