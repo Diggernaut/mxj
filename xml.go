@@ -30,11 +30,12 @@ func init() {
 	checkKeys = make(map[string]string)
 	re = regexp.MustCompile(`^[A-Za-z]+`)
 	s = strings.NewReplacer(":", "_",
-		"@", "_")
+		"@", "_", "/","_", "\\"," ")
 }
 
 func checkKey(key string) string {
 	key = SpaceMap(key)
+	key = strings.TrimSpace(key)
 	key = s.Replace(key)
 	key = strings.ToLower(key)
 	
