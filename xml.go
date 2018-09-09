@@ -37,7 +37,7 @@ func init() {
 	checkKeys = make(map[string]string)
 	re = regexp.MustCompile(`^[A-Za-z]+`)
 	s = strings.NewReplacer(":", "_",
-		"@", "_", "/", "_", "\\", "_","?", "_")
+		"@", "_", "/", "_", "\\", "_", "?", "_", "$", "_")
 }
 
 func checkKey(key string) string {
@@ -1072,7 +1072,7 @@ func mapToXmlIndentByte(doIndent bool, buffer *bytes.Buffer, key string, value i
 	p := &pretty{pp.indent, pp.cnt, pp.padding, pp.mapDepth, pp.start}
 	switch value.(type) {
 	// special handling of []interface{} values when len(value) == 0
-	case map[string]interface{}, map[interface{}]interface{}, []byte, string, float64, bool, int, int32, int64, float32, json.Number, transit.Keyword, *decimal.Decimal, big.Int, time.Time, uuid.UUID, *url.URL,  transit.CMap, *transit.Link,	big.Rat:
+	case map[string]interface{}, map[interface{}]interface{}, []byte, string, float64, bool, int, int32, int64, float32, json.Number, transit.Keyword, *decimal.Decimal, big.Int, time.Time, uuid.UUID, *url.URL, transit.CMap, *transit.Link, big.Rat:
 		if doIndent {
 			buffer.Write([]byte(p.padding))
 		}
@@ -1196,11 +1196,11 @@ func mapToXmlIndentByte(doIndent bool, buffer *bytes.Buffer, key string, value i
 			if key, ok := k.(string); ok {
 				vv[key] = v
 			}
-			if key, ok := k.(transit.Keyword);ok{
+			if key, ok := k.(transit.Keyword); ok {
 				vv[key.String()] = v
 			}
 		}
-		
+
 		lenvv := len(vv)
 		// scan out attributes - attribute keys have prepended attrPrefix
 		attrlist := make([][2]string, len(vv))
@@ -1438,7 +1438,7 @@ func mapToXmlIndentByte(doIndent bool, buffer *bytes.Buffer, key string, value i
 	default: // handle anything - even goofy stuff
 		elen = 0
 		switch value.(type) {
-		case 	big.Rat:
+		case big.Rat:
 			v := value.(big.Rat)
 			elen = len(v.String()) // always > 0
 			buffer.Write([]byte(">" + v.String()))
@@ -1558,7 +1558,7 @@ func mapToXmlIndentByte(doIndent bool, buffer *bytes.Buffer, key string, value i
 				v, err = xml.Marshal(value)
 			}
 			if err != nil {
-				
+
 				buffer.Write([]byte(">UNKNOWN"))
 			} else {
 				elen = len(v)
