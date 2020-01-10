@@ -181,7 +181,6 @@ func AnyXmlIndentByte(v interface{}, prefix, indent string, tags ...string) ([]b
 	if reflect.TypeOf(v).Kind() == reflect.Struct {
 		return xml.MarshalIndent(v, prefix, indent)
 	}
-
 	var err error
 	var buffer bytes.Buffer
 	p := new(pretty)
@@ -238,5 +237,63 @@ func AnyXmlIndentByte(v interface{}, prefix, indent string, tags ...string) ([]b
 	}
 	return b, err
 }
+func AnyXmlIndentByteSpecial(v interface{}, prefix, indent string, tags ...string) ([]byte, error) {
+	if reflect.TypeOf(v).Kind() == reflect.Struct {
+		return xml.MarshalIndent(v, prefix, indent)
+	}
+	var err error
+	var buffer bytes.Buffer
+	p := new(pretty)
+	p.indent = indent
+	p.padding = prefix
 
-
+	var rt, et string
+	if len(tags) == 1 || len(tags) == 2 {
+		rt = tags[0]
+	} else {
+		rt = DefaultRootTag
+	}
+	if len(tags) == 2 {
+		et = tags[1]
+	} else {
+		et = DefaultElementTag
+	}
+	rt = checkKey(rt)
+	et = checkKey(et)
+	var b []byte
+	switch v.(type) {
+	case []interface{}:
+		_, err = buffer.Write([]byte("<" + checkKey(rt) + ">\n"))
+		p.Indent()
+		for _, vv := range v.([]interface{}) {
+			switch vv.(type) {
+			case map[string]interface{}:
+				m := vv.(map[string]interface{})
+				if len(m) == 1 {
+					for tag, val := range m {
+						err = mapToXmlIndentByteSpecial(true, &buffer, checkKey(tag), val, p, true)
+					}
+				} else {
+					p.start = 1 // we 1 tag in
+					err = mapToXmlIndentByteSpecial(true, &buffer, et, vv, p, true)
+					_, err = buffer.Write([]byte("\n"))
+				}
+			default:
+				p.start = 0 // in case trailing p.start = 1
+				err = mapToXmlIndentByteSpecial(true, &buffer, et, vv, p, true)
+			}
+			if err != nil {
+				break
+			}
+		}
+		buffer.Write([]byte("</" + rt + ">"))
+		b = buffer.Bytes()
+	case map[string]interface{}:
+		m := Map(v.(map[string]interface{}))
+		b, err = m.XmlIndentByteSpecial(prefix, indent, rt)
+	default:
+		err = mapToXmlIndentByteSpecial(true, &buffer, rt, v, p, true)
+		b = buffer.Bytes()
+	}
+	return b, err
+}
