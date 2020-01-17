@@ -13,7 +13,7 @@ var xmlEscapeChars bool
 // XMLEscapeChars(true) forces escaping invalid characters in attribute and element values.
 // NOTE: this is brute force with NO interrogation of '&' being escaped already; if it is
 // then '&amp;' will be re-escaped as '&amp;amp;'.
-//  
+//
 /*
 	The values are:
 	"   &quot;
@@ -26,7 +26,7 @@ func XMLEscapeChars(b bool) {
 	xmlEscapeChars = b
 }
 
-// Scan for '&' first, since 's' may contain "&amp;" that is parsed to "&amp;amp;" 
+// Scan for '&' first, since 's' may contain "&amp;" that is parsed to "&amp;amp;"
 // - or "&lt;" that is parsed to "&amp;lt;".
 var escapechars = [][2][]byte{
 	{[]byte(`&`), []byte(`&amp;`)},
@@ -37,18 +37,30 @@ var escapechars = [][2][]byte{
 }
 
 func escapeChars(s string) string {
-	if len(s) == 0 {
-		return s
-	}
+	// if len(s) == 0 {
+	// 	return s
+	// }
 
-	b := []byte(s)
+	// b := []byte(s)
+	// for _, v := range escapechars {
+	// 	n := bytes.Count(b, v[0])
+	// 	if n == 0 {
+	// 		continue
+	// 	}
+	// 	b = bytes.Replace(b, v[0], v[1], n)
+	// }
+	// return string(b)
+	// if len(s) == 0 {
+	// 	return s
+	// }
+
+	// b := []byte(s)
 	for _, v := range escapechars {
-		n := bytes.Count(b, v[0])
+		n := bytes.Count([]byte(s), v[0])
 		if n == 0 {
 			continue
 		}
-		b = bytes.Replace(b, v[0], v[1], n)
+		s = string(bytes.Replace([]byte(s), v[0], v[1], n))
 	}
-	return string(b)
+	return s
 }
-
